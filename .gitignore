@@ -1,0 +1,14 @@
+.DS_Store
+
+log.log
+
+__pychache__/
+
+data/**
+!data/.gitkeep
+
+!data/raw_data
+data/raw_data/**
+!data/raw_data/.gitkeep
+
+
