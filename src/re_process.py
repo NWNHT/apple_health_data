@@ -55,12 +55,13 @@ class xmlprocess:
                 quit()
         return self._root
 
+def remove_xml_headers(filename: str):
+    pass
 
 if __name__ == '__main__':
 
-
     # reprocess = reProcess(filename='./../data/raw_data/export-2022-11-22.xml')
-    xmlprocess = xmlprocess(filename='./../data/raw_data/export-2022-11-22.xml')
+    xmlprocess = xmlprocess(filename='./../data/raw_data/export-2022-11-27.xml')
 
     start = time.perf_counter()
     result = xmlprocess.root
