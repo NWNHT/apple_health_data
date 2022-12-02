@@ -1,7 +1,5 @@
 import logging
-from multiprocessing import Pool
 from os.path import isfile
-import pandas as pd
 import sqlite3
 import time
 from typing import List, Optional
@@ -13,11 +11,11 @@ class DBConn:
 
 	def __new__(cls, *args, **kwargs):
 		if cls.instance == None:
-			cls.instance = super().__new__(DBConn)
+			cls.instance = super().__new__(cls)
 		return cls.instance
 	
-	def __init__(self, db_name: str):
-		self.data_path = './../data/'
+	def __init__(self, db_name: str, filepath: str='./'):
+		self.data_path = filepath
 		self.name = db_name
 		self.conn = self.connect()
 		self.cursor = self.conn.cursor()
@@ -116,26 +114,12 @@ class DBConn:
 		else:
 			return self.cursor.execute(query, arguments)
 
-	def does_game_exist_by_id(self, game_id: int) -> bool:
-		"""
-		Return a bool indicating if a game is in the database
-		"""
-
-		sql_query = """SELECT DISTINCT game_id
-					   FROM Game
-					   WHERE game_id = ?"""
-		
-		resp = self.cursor.execute(sql_query, (game_id,)).fetchall()
-
-		return bool(len(resp))
-
 
 if __name__ == '__main__':
 
 	start = time.perf_counter()
 
 	db = DBConn('health_data.db')
-
 
 	del(db)
 

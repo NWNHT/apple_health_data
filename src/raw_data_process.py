@@ -1,11 +1,12 @@
 
 import logging
+from os.path import isfile
 import pandas as pd
 import re
 import time
 import xml.etree.ElementTree as et
 
-from DBConn import DBConn
+from AppleHealthDB import AppleHealthDB
 
 logger = logging.getLogger('__main__.' + __name__)
 
@@ -27,7 +28,8 @@ class reProcess:
 
         return result
 
-class xmlprocess:
+class XMLProcess:
+    """Class to parse """
     def __init__(self, filename: str) -> None:
         self.filename = filename
         self.db = None
@@ -56,9 +58,10 @@ class xmlprocess:
                 quit()
         return self._root
 
-def add_to_database(root, batch_size: int=10000, file_name: str='apple_health_data'):
+def add_to_database(root, batch_size: int=10000, filename: str='apple_health_data') -> AppleHealthDB:
     """Take the root of the xml tree and commit all records to the database"""
-    db = DBConn(db_name=file_name + '.db')
+    db = AppleHealthDB(db_name=filename + '.db')
+    print(db.__dict__)
     db.drop_tables()
     db.create_tables()
 
@@ -109,6 +112,35 @@ def add_to_database(root, batch_size: int=10000, file_name: str='apple_health_da
         if len(batch):
             logger.debug(f"Execute many on i = {i}")
             db.execute_many(create_record_command, batch)
+    
+    return db
+
+def xml_to_sql(filename: str='export-2022-11-27') -> AppleHealthDB:
+    """Given xml file name(sans .xml), create a SQLite database of the same name"""
+
+    if isfile(f"./../data/{filename}.db"):
+        logger.info(f"SQLite database already exists for file {filename}.")
+        return AppleHealthDB(db_name=filename + '.db')
+    elif not isfile(f"./../data/raw_data/{filename}.xml"):
+        logger.critical(f"File {filename}.xml does not exist.")
+        quit()
+    else:
+        logger.info(f"File {filename}.xml found but no database exists, creating database.")
+
+    # Create xml processing object
+    xmlprocess = XMLProcess(filename='./../data/raw_data/' + filename + '.xml')
+
+    # Parse the xml
+    start = time.perf_counter()
+    result = xmlprocess.root
+    logger.info(f"Total process time: {time.perf_counter() - start}")
+
+    # Read the xml and commit to sqlite database
+    start = time.perf_counter()
+    db = add_to_database(result, filename=filename)
+    logger.info(f"Total database time: {time.perf_counter() - start}")
+
+    return db
         
 if __name__ == '__main__':
 
@@ -131,7 +163,7 @@ if __name__ == '__main__':
     logger.addHandler(s_handler)
 
     # Create xml processing object
-    xmlprocess = xmlprocess(filename='./../data/raw_data/export-2022-11-27.xml')
+    xmlprocess = XMLProcess(filename='./../data/raw_data/export-2022-11-27.xml')
 
     # Parse the xml
     start = time.perf_counter()
