@@ -17,10 +17,10 @@ class DBConn:
 		return cls.instance
 	
 	def __init__(self, db_name: str):
+		self.data_path = './../data/'
 		self.name = db_name
 		self.conn = self.connect()
 		self.cursor = self.conn.cursor()
-		self.data_path = './../data/'
 	
 	def connect(self):
 		"""
@@ -30,13 +30,13 @@ class DBConn:
 		# Create db and make tables if it does not exist
 		if not isfile(self.data_path + self.name):
 			try:
-				self.conn = sqlite3.connect(self.name)
+				self.conn = sqlite3.connect(self.data_path + self.name)
 				self.cursor = self.conn.cursor()
 				logger.info('No existing database, creating database.')
 				self.create_tables()
 				return self.conn
-			except:
-				logger.critical("Error creating database.")
+			except Exception as e:
+				logger.critical(f"Error creating database: {e}")
 				quit()
 		else:
 			try:
@@ -55,7 +55,7 @@ class DBConn:
 		Perform commit on database
 		"""
 
-		logger.info("Committing to database.")
+		logger.debug("Committing to database.")
 		self.conn.commit()
 
 	def drop_tables(self):
@@ -94,6 +94,17 @@ class DBConn:
 			self.cursor.execute(command, arguments)
 		if commit: self.commit()
 
+	def execute_many(self, command: str, arguments: List[tuple], commit: bool=True):
+		"""
+		Execute many arbitrary commands
+		"""
+
+		logger.debug(f"Executing command {command}.")
+
+		self.cursor.executemany(command, arguments)
+
+		if commit: self.commit()
+
 	def execute_query(self, query: str, arguments: Optional[tuple]=None):
 		"""
 		Execute arbitrary query
@@ -117,41 +128,6 @@ class DBConn:
 		resp = self.cursor.execute(sql_query, (game_id,)).fetchall()
 
 		return bool(len(resp))
-
-	def evaluate_game_by_id(self, game_id: int, parallel: bool=False, commit: bool=True):
-		"""
-		Evaluate all positions from the given game_id
-		"""
-
-		sql_read_command = """	SELECT p.position_id, p.fen
-								FROM Game g
-								JOIN GameMove gm
-								ON g.game_id = gm.game_id
-								JOIN Move m
-								ON gm.move_id = m.move_id
-								JOIN Position p
-								ON m.position_id = p.position_id
-								WHERE g.game_id = ?
-								  AND (eval_depth < ? or eval_depth IS NULL)
-								ORDER BY move_num"""
-		sql_write_command = """UPDATE Position SET eval_depth=?, first_move=?, second_move=?, third_move=?, first_move_eval=?, second_move_eval=?, third_move_eval=?, first_move_eval_type=?, second_move_eval_type=?, third_move_eval_type=? WHERE position_id = ?"""
-
-		# Request positions without an evaluation
-		self.cursor.execute(sql_read_command, (game_id, self.sf_depth))
-		resp = self.cursor.fetchall()
-		logger.info(f"Evaluating {len(resp)} positions at depth {self.sf_depth}.")
-
-		# Get the evaluations
-		if parallel:
-			evaluations = self.eval_positions_parallel(resp)
-		else:
-			evaluations = self.eval_positions(resp)
-
-		logger.debug("Done evaluating positions.")
-
-		# Write all of the evaluations to the database
-		self.cursor.executemany(sql_write_command, evaluations)
-		if commit: self.commit()
 
 
 if __name__ == '__main__':

@@ -11,6 +11,7 @@ logger = logging.getLogger('__main__.' + __name__)
 
 class reProcess:
     # Note that this leaves out the HKMetadatKeyHeartRateMotionContext metadata
+    # This loses some data from the structure of the xml, who would have thought
     def __init__(self, filename: str) -> None:
         self.filename = filename
         self.db = None
@@ -55,18 +56,89 @@ class xmlprocess:
                 quit()
         return self._root
 
-def remove_xml_headers(filename: str):
-    pass
+def add_to_database(root, batch_size: int=10000, file_name: str='apple_health_data'):
+    """Take the root of the xml tree and commit all records to the database"""
+    db = DBConn(db_name=file_name + '.db')
+    db.drop_tables()
+    db.create_tables()
 
+    create_record_type_command = """INSERT INTO RecordType (record_type) VALUES (?)"""
+    create_unit_type_command = """INSERT INTO UnitType (unit) VALUES (?)"""
+    create_record_command = """INSERT INTO Data (record_type_id, 
+                                                 unit_id,
+                                                 creation_date, 
+                                                 starting_date, 
+                                                 ending_date, 
+                                                 record_value) 
+                               VALUES ((SELECT record_type_id FROM RecordType WHERE record_type=?), 
+                                       (SELECT unit_id FROM UnitType WHERE unit=?), ?, ?, ?, ?)"""
+
+    batch = []
+    record_type_cache = []
+    unit_type_cache = []
+    for i, record in enumerate(root.findall('Record'), start=1):
+
+        record = record.attrib
+        record_type = record.get('type', None)
+        unit = record.get('unit', None)
+
+        # Create the RecordType and UnitType tables as new types are found
+        # This has cut like 25% of the database size
+        if record_type not in record_type_cache:
+            logger.debug(f"Adding {record_type} as a type.")
+            db.execute_command(create_record_type_command, (record_type,))
+            record_type_cache.append(record_type)
+
+        if unit not in unit_type_cache:
+            logger.debug(f"Adding {unit} as a unit.")
+            db.execute_command(create_unit_type_command, (unit,))
+            unit_type_cache.append(unit)
+
+        try:
+            batch.append((record_type, unit, record['creationDate'], record['startDate'], record['endDate'], record.get('value', None)))
+        except Exception as e:
+            logger.warning(f"Errored on entry {i}, skipping because of error: {e}")
+
+        # Batch the commits
+        if not i % batch_size:
+            logger.debug(f"Execute many on i = {i}")
+            db.execute_many(create_record_command, batch)
+            batch = []
+    else:
+        # commit the final set not included in the last full batch
+        if len(batch):
+            logger.debug(f"Execute many on i = {i}")
+            db.execute_many(create_record_command, batch)
+        
 if __name__ == '__main__':
 
-    # reprocess = reProcess(filename='./../data/raw_data/export-2022-11-22.xml')
+    # Logging  
+    # Create formatter and the two handlers
+    log_format = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s - %(name)s')
+    f_handler = logging.FileHandler('log.log')
+    s_handler = logging.StreamHandler()
+
+    # Set the levels and formats of the handlers
+    f_handler.setLevel(logging.DEBUG)
+    s_handler.setLevel(logging.INFO)
+    f_handler.setFormatter(log_format)
+    s_handler.setFormatter(log_format)
+
+    # Get the logger
+    logger = logging.getLogger(__name__)   
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(f_handler)
+    logger.addHandler(s_handler)
+
+    # Create xml processing object
     xmlprocess = xmlprocess(filename='./../data/raw_data/export-2022-11-27.xml')
 
+    # Parse the xml
     start = time.perf_counter()
     result = xmlprocess.root
-    print(time.perf_counter() - start)
+    logger.info(f"Total process time: {time.perf_counter() - start}")
 
-    print(len(result))
-
-    print(result[0])
+    # Read the xml and commit to sqlite database
+    start = time.perf_counter()
+    add_to_database(result)
+    logger.info(f"Total database time: {time.perf_counter() - start}")
