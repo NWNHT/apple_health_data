@@ -20,3 +20,28 @@ CREATE TABLE UnitType (
 	unit_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 	unit TEXT UNIQUE
 );
+
+CREATE TABLE Sleep (
+	record_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+	time_range TEXT,
+	from_date TEXT,
+	to_date TEXT,
+	bedtime TEXT,
+	waketime TEXT,
+	in_bed TEXT,
+	awake TEXT,
+	fell_asleep_in TEXT,
+	num_sessions int,
+	asleep TEXT,
+	efficiency REAL,
+	quality TEXT,
+	deep TEXT,
+	sleep_BPM REAL,
+	day_BPM REAL,
+	waking_BPM REAL,
+	hrv INT,
+	sleep_hrv INT,
+	resp_avg REAL,
+	resp_min REAL,
+	resp_max REAL
+)

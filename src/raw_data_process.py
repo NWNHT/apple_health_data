@@ -4,6 +4,7 @@ from os.path import isfile
 import pandas as pd
 import re
 import time
+from typing import Optional
 import xml.etree.ElementTree as et
 
 from AppleHealthDB import AppleHealthDB
@@ -27,6 +28,7 @@ class reProcess:
             result = patt.findall(fh.read())
 
         return result
+
 
 class XMLProcess:
     """Class to parse """
@@ -58,12 +60,10 @@ class XMLProcess:
                 quit()
         return self._root
 
+
 def add_to_database(root, batch_size: int=10000, filename: str='apple_health_data') -> AppleHealthDB:
     """Take the root of the xml tree and commit all records to the database"""
     db = AppleHealthDB(db_name=filename + '.db')
-    print(db.__dict__)
-    db.drop_tables()
-    db.create_tables()
 
     create_record_type_command = """INSERT INTO RecordType (record_type) VALUES (?)"""
     create_unit_type_command = """INSERT INTO UnitType (unit) VALUES (?)"""
@@ -115,7 +115,37 @@ def add_to_database(root, batch_size: int=10000, filename: str='apple_health_dat
     
     return db
 
-def xml_to_sql(filename: str='export-2022-11-27') -> AppleHealthDB:
+
+def add_sleep_data(db: AppleHealthDB, filename: str):
+    """Add Autosleep data to database
+
+    Args:
+        db (AppleHealthDB): _description_
+        filename (str): _description_
+    """
+
+    # Read data
+    sleep_data = pd.read_csv('./../data/raw_data/' + filename)
+
+    # Filter data
+    filter_strings = ['Avg7', 'SpO2', 'tags', 'notes']
+    keep_columns = [x for x in sleep_data.columns if all(y not in x for y in filter_strings)]
+    sleep_data = sleep_data[keep_columns]
+
+    # Set up query
+    columns = ['time_range', 'from_date', 'to_date', 'bedtime', 'waketime', 'in_bed', 'awake', 'fell_asleep_in', 'num_sessions', 'asleep', 'efficiency', 'quality', 'deep', 'sleep_BPM', 'day_BPM', 'waking_BPM', 'hrv', 'sleep_hrv', 'resp_avg', 'resp_min', 'resp_max']
+    columns_string = ', '.join(columns)
+    values_string = ', '.join(['?'] * len(columns))
+    sql_query = f"""
+    INSERT INTO Sleep ({columns_string})
+    VALUES ({values_string})
+    """
+
+    # Execute query
+    db.execute_many(sql_query, sleep_data.values.tolist())
+
+
+def create_database(filename: str='export-2022-11-27', auto_sleep_data_filename: Optional[str] = None) -> AppleHealthDB:
     """Given xml file name(sans .xml), create a SQLite database of the same name"""
 
     if isfile(f"./../data/{filename}.db"):
@@ -140,7 +170,13 @@ def xml_to_sql(filename: str='export-2022-11-27') -> AppleHealthDB:
     db = add_to_database(result, filename=filename)
     logger.info(f"Total database time: {time.perf_counter() - start}")
 
+    start = time.perf_counter()
+    if auto_sleep_data_filename is not None:
+        add_sleep_data(db, auto_sleep_data_filename)
+    logger.info(f"Total sleep data time: {time.perf_counter() - start}")
+
     return db
+
         
 if __name__ == '__main__':
 
