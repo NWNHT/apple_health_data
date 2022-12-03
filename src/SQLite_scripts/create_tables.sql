@@ -23,7 +23,7 @@ CREATE TABLE UnitType (
 
 CREATE TABLE Sleep (
 	record_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-	time_range TEXT,
+	date TEXT,
 	from_date TEXT,
 	to_date TEXT,
 	bedtime TEXT,

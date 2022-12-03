@@ -1,4 +1,5 @@
 
+import datetime
 import logging
 from os.path import isfile
 import pandas as pd
@@ -125,15 +126,17 @@ def add_sleep_data(db: AppleHealthDB, filename: str):
     """
 
     # Read data
+    logger.info(f"Reading AutoSleep data from file: {filename}")
     sleep_data = pd.read_csv('./../data/raw_data/' + filename)
 
     # Filter data
     filter_strings = ['Avg7', 'SpO2', 'tags', 'notes']
     keep_columns = [x for x in sleep_data.columns if all(y not in x for y in filter_strings)]
     sleep_data = sleep_data[keep_columns]
+    sleep_data = clean_sleep_data(sleep_data)
 
     # Set up query
-    columns = ['time_range', 'from_date', 'to_date', 'bedtime', 'waketime', 'in_bed', 'awake', 'fell_asleep_in', 'num_sessions', 'asleep', 'efficiency', 'quality', 'deep', 'sleep_BPM', 'day_BPM', 'waking_BPM', 'hrv', 'sleep_hrv', 'resp_avg', 'resp_min', 'resp_max']
+    columns = ['date', 'from_date', 'to_date', 'bedtime', 'waketime', 'in_bed', 'awake', 'fell_asleep_in', 'num_sessions', 'asleep', 'efficiency', 'quality', 'deep', 'sleep_BPM', 'day_BPM', 'waking_BPM', 'hrv', 'sleep_hrv', 'resp_avg', 'resp_min', 'resp_max']
     columns_string = ', '.join(columns)
     values_string = ', '.join(['?'] * len(columns))
     sql_query = f"""
@@ -142,7 +145,15 @@ def add_sleep_data(db: AppleHealthDB, filename: str):
     """
 
     # Execute query
+    logger.debug(f"Adding AutoSleep data to SQLite db.")
     db.execute_many(sql_query, sleep_data.values.tolist())
+
+
+def clean_sleep_data(df: pd.DataFrame):
+    # Clean time_range to just include date, move back a day
+    df['ISO8601'] = df['ISO8601'].apply(lambda x: (datetime.date.fromisoformat(x[:10]) - datetime.timedelta(days=1)).isoformat())
+    
+    return df
 
 
 def create_database(filename: str='export-2022-11-27', auto_sleep_data_filename: Optional[str] = None) -> AppleHealthDB:
