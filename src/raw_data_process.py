@@ -152,7 +152,15 @@ def add_sleep_data(db: AppleHealthDB, filename: str):
 def clean_sleep_data(df: pd.DataFrame):
     # Clean time_range to just include date, move back a day
     df['ISO8601'] = df['ISO8601'].apply(lambda x: (datetime.date.fromisoformat(x[:10]) - datetime.timedelta(days=1)).isoformat())
-    
+
+    duration_columns = ['inBed', 'awake', 'fellAsleepIn', 'asleep', 'quality', 'deep']
+    today = datetime.datetime.today()
+    for col in duration_columns:
+        df[col] = df[col].fillna('00:00:00')
+        df[col] = df[col].apply(lambda x: (datetime.datetime.fromisoformat(datetime.date.today().isoformat() + ' ' + str(x)) 
+                                           - datetime.datetime(year=today.year, month=today.month, day=today.day))
+                                .total_seconds())
+
     return df
 
 

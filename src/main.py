@@ -1,4 +1,5 @@
 
+import datetime
 import logging
 import pandas as pd
 import plotnine as gg
@@ -46,12 +47,12 @@ if __name__ == '__main__':
     steps = "HKQuantityTypeIdentifierStepCount"
 
     # df = pd.DataFrame(db.record_by_date_range(flights, '2022-08-10', '2022-08-20').fetchall(), columns=['id', 'record_type', 'unit', 'creation_date', 'start_date', 'end_date', 'value']).set_index('id')
-    df = pd.DataFrame(db.sum_by_date_range(steps, start_date='2018-10-01').fetchall(), columns=['date', 'value']).set_index('date')
-    df['value'] = df['value'].apply(lambda x: 30000 if x > 50000 else x)
-    # print(df)
+    # df = pd.DataFrame(db.sum_by_date_range(steps, start_date='2018-10-01').fetchall(), columns=['date', 'value']).set_index('date')
+    # df['value'] = df['value'].apply(lambda x: 30000 if x > 50000 else x)
+    # # print(df)
 
-    g = gg.ggplot(df, gg.aes(x=df.index, y='value')) + gg.geom_col(fill='#ff4f00') + gg.scale_x_datetime(date_breaks="5 months", expand=(0,0))
-    f = gg.ggplot(df, gg.aes(x='value')) + gg.geom_histogram(binwidth=1000, fill='#ff4f00')
+    # g = gg.ggplot(df, gg.aes(x=df.index, y='value')) + gg.geom_col(fill='#ff4f00') + gg.scale_x_datetime(date_breaks="5 months", expand=(0,0))
+    # f = gg.ggplot(df, gg.aes(x='value')) + gg.geom_histogram(binwidth=1000, fill='#ff4f00')
     # print(f)
 
     sql_query = """
@@ -68,11 +69,45 @@ if __name__ == '__main__':
     GROUP BY 1, 2
     """
 
-    df2 = pd.DataFrame(db.execute_query(sql_query, (flights, '2018-10-01', db.last_date)).fetchall(), columns=['year', 'day', 'value'])
-    f = (gg.ggplot(df2, gg.aes(x='value')) 
-       + gg.geom_histogram(binwidth=1, fill='#ff4f00', colour='black')
-       + gg.facet_grid('year ~ .'))
-    print(f)
+    # df2 = pd.DataFrame(db.execute_query(sql_query, (flights, '2018-10-01', db.last_date)).fetchall(), columns=['year', 'day', 'value'])
+    # f = (gg.ggplot(df2, gg.aes(x='value')) 
+    #    + gg.geom_histogram(binwidth=1, fill='#ff4f00', colour='black')
+    #    + gg.facet_grid('year ~ .'))
+    # print(f)
 
+    # Get the summary steps for a day
+    # Get the quality and deep sleep for a day
+    # join on date
+    sql_query2 = """
+    SELECT one.date, two.bedtime, two.waketime, one.value, two.efficiency, two.quality, two.deep, two.awake, two.fell_asleep_in, two.in_bed
+    FROM
+    (SELECT SUBSTR(d.starting_date, 0, 11) as date,
+            SUM(record_value) as value
+    FROM Data d
+    JOIN RecordType r
+    ON d.record_type_id = r.record_type_id
+    JOIN UnitType u
+    ON d.unit_id = u.unit_id
+    WHERE r.record_type = ?
+      AND d.starting_date BETWEEN DATE(?) AND DATE(?)
+    GROUP BY 1) one
+    JOIN
+    (SELECT date,
+            bedtime,
+            waketime,
+            efficiency,
+            quality,
+            deep,
+            awake,
+            fell_asleep_in,
+            in_bed
+    FROM Sleep
+    WHERE date BETWEEN DATE(?) and DATE(?)) two
+    ON one.date = two.date
+    """
 
-    
+    df3 = pd.DataFrame(db.execute_query(sql_query2, (steps, '2020-03-09', '2022-12-01', '2020-03-09', '2022-12-01')), 
+                       columns=['date', 'bedtime', 'waketime', 'steps', 'efficiency', 'quality', 'deep', 'awake', 'fell_asleep_in', 'in_bed'])
+
+    h = gg.ggplot(df3, gg.aes(x='bedtime', y='')) + gg.geom_point() + gg.scale_x_datetime(date_breaks='6 months')
+    print(h)
