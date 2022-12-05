@@ -11,4 +11,6 @@ data/**
 data/raw_data/**
 !data/raw_data/.gitkeep
 
+plots/**
+!plots/.gitkeep
 
